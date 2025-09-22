@@ -1,0 +1,2 @@
+# Bot-de-Pedidos-Por-Whatsapp---Aplicaci-n-Inteligente-EMAG
+Automatización completa de pedidos mayoristas de refrigerantes y agua destilada, usando n8n, Postgres, Evolution API y Docker. Este bot replica la lógica de un carrito de e-commerce, pero directamente en WhatsApp, permitiendo a los clientes: seleccionar productos, editar cantidades, eliminar, vaciar carrito, ingresar dirección y confirmar su pedido
