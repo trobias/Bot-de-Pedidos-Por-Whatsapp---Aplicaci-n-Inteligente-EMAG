@@ -1,5 +1,17 @@
 # 🤖 Bot de Pedidos por WhatsApp – Refrigerantes EMAG
 
+Este bot fue diseñado para **Refrigerantes EMAG**, un negocio de venta mayorista de
+**refrigerantes y agua destilada**.  
+En lugar de que los clientes tengan que entrar a un **e-commerce tradicional**, todo el proceso de compra ocurre **directamente en WhatsApp**:
+
+- Selección de productos desde un **catálogo interactivo**.
+- Edición y eliminación de ítems como en un carrito online.
+- Confirmación obligatoria con **dirección o ubicación GPS**.
+- Transferencia a un **humano/distribuidor** para cerrar el pedido.
+
+👉 Ideal para **ventas B2B o mayoristas**, donde los clientes suelen preferir
+**hablar por WhatsApp** en lugar de usar una tienda online.
+
 Automatización completa de **pedidos mayoristas** (refrigerantes y agua destilada) usando **n8n**, **Postgres**, **Evolution API** y **Docker**.
 Este bot replica la lógica de un **carrito de e-commerce** directamente en **WhatsApp**: seleccionar productos, editar cantidades, eliminar ítems, vaciar carrito, ingresar dirección y **confirmar** el pedido.
 
@@ -386,10 +398,9 @@ Evita que el flujo se rompa cuando el carrito queda vacío:
    docker compose up -d
    ```
 
-4. Abrir **n8n** (`http://localhost:5678/`) e **importar** el workflow:
-   `My workflow 2 (19).json`.
+4. Configurar el **webhook** de Evolution API → URL pública de n8n.
 
-5. Configurar el **webhook** de Evolution API → URL pública de n8n.
+5. Replicalo
 
 ---
 
