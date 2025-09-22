@@ -1,182 +1,455 @@
-# Bot-de-Pedidos-Por-Whatsapp--Aplicacion-Inteligente-EMAG
-Automatización completa de pedidos mayoristas de refrigerantes y agua destilada, usando n8n, Postgres, Evolution API y Docker.
-Este bot replica la lógica de un carrito de e-commerce, pero directamente en WhatsApp, permitiendo a los clientes: seleccionar productos, editar cantidades, eliminar, vaciar carrito, ingresar dirección y confirmar su pedido.
+# 🤖 Bot de Pedidos por WhatsApp – Refrigerantes EMAG
 
-🛠️ Tecnologías y dependencias
+Automatización completa de **pedidos mayoristas** (refrigerantes y agua destilada) usando **n8n**, **Postgres**, **Evolution API** y **Docker**.
+Este bot replica la lógica de un **carrito de e-commerce** directamente en **WhatsApp**: seleccionar productos, editar cantidades, eliminar ítems, vaciar carrito, ingresar dirección y **confirmar** el pedido.
 
-Docker Compose – orquestación de servicios.
+---
 
-Postgres 16 – base de datos para almacenar borradores de pedidos.
+## 📚 Índice técnico
 
-n8n 1.110.1 – motor de automatización del flujo.
+* [Arquitectura](#-arquitectura)
+* [Docker Compose (ejemplo)](#-docker-compose-ejemplo)
+* [Variables de entorno](#-variables-de-entorno)
+* [Flujo del bot (workflow)](#-flujo-del-bot-workflow)
+* [Uso rápido](#-uso-rápido)
+* [Modo sin LLM (100% determinístico)](#-modo-sin-llm-100-determinístico)
+* [Extensiones futuras](#-extensiones-futuras)
+* [Licencia](#-licencia)
 
-Evolution API – gateway de WhatsApp para enviar/recibir mensajes.
+---
 
-Node.js (n8n) – nodos Code para lógica en JavaScript.
+## 📷 Ejemplos visuales
 
-LLM opcional (Gemini / OpenAI) – usado solo como router de intenciones.
+### 🔄 Workflow en n8n
 
-📂 Ejemplo de stack en docker-compose.yml:
+Vista completa del flujo de automatización:
 
-n8n
+<img width="1612" height="772" alt="image" src="https://github.com/user-attachments/assets/62c3173e-2bce-42d4-a220-62e3643c5fbf" />
 
-postgres
 
-evolution-api
+Ejemplo de interacción con Postgres:
 
-⚙️ Instalación
+<img width="1080" height="394" alt="image" src="https://github.com/user-attachments/assets/ab4199ed-bd63-47a4-a603-c3ebf2c11e14" />
 
-Clonar este repositorio.
+---
 
-Configurar variables de entorno para Postgres y Evolution API.
+### 💬 Bot en WhatsApp
 
-Levantar los servicios con:
+Inicio de conversación (mensaje de bienvenida):
 
-docker compose up -d
+<img width="413" height="254" alt="image" src="https://github.com/user-attachments/assets/32f9d154-fb08-44fa-ba15-80a0ba14a63c" />
 
+Selección de productos con **lista interactiva**:
 
-Importar el workflow desde My workflow 2 (19).json en n8n.
+<img width="417" height="190" alt="image" src="https://github.com/user-attachments/assets/9d906ce6-f845-40df-9f52-8d649613521c" />
 
-🔄 Flujo del bot (workflow)
+**LISTA**:
 
-Webhook Evolution API → recibe mensajes de WhatsApp.
+<img width="482" height="810" alt="image" src="https://github.com/user-attachments/assets/c38d8462-b987-483b-bba1-573fd35bd256" />
 
-Parse Message → extrae:
+Carrito con **resumen de pedido**:
 
-chat_id
+<img width="563" height="295" alt="image" src="https://github.com/user-attachments/assets/b2bc8b15-c94d-4f0c-9d1f-d1f56f5322ca" />
 
-texto
+**LISTA**
 
-selectedRowId y selectedDescription (si viene de catálogo/lista)
+<img width="432" height="489" alt="image" src="https://github.com/user-attachments/assets/93403de4-35a2-44e5-9f25-827199fa41b1" />
 
-ubicación GPS (latitude, longitude).
+Confirmación de pedido con **dirección o ubicación GPS**:
 
-Detect Pedido → determina acción (insert, update, summary, address, update_specific, delete_one, etc.).
+<img width="809" height="434" alt="image" src="https://github.com/user-attachments/assets/e7d14669-bd1a-48d1-b2b4-52206133a911" />
 
-Postgres → guarda y actualiza en la tabla orders_draft.
+---
 
-Build Summary → genera resumen del pedido con totales e importe.
+## 📦 Lógica del pedido (CRUD)
 
-Switch de acciones → decide siguiente paso:
+* **Create (INSERT)**: selecciona producto desde **lista/catálogo** o por texto.
+* **Read (READ)**: ver **catálogo** o **resumen** del carrito.
+* **Update (UPDATE)**: cambia **cantidad** o **edita** un producto específico.
+* **Delete (DELETE)**: **elimina** un ítem o **vacía** todo el carrito.
 
-mostrar catálogo
+**Tabla clave:** `orders_draft` con
+`id, chat_id, product_code, product_label, quantity, status, address, pending_edit_row`.
 
-editar cantidad
+---
 
-eliminar producto
+## ✨ Características principales
 
-vaciar carrito
+* Pedidos por **WhatsApp** (sin apps externas).
+* **Catálogo interactivo** (List Messages).
+* **Control de carrito**:
+  * Agregar productos.
+  * **Editar cantidades** (incluye *editar específico*).
+  * **Eliminar** productos.
+  * **Vaciar** carrito completo.
+  * **Reiniciar** carrito (reset por `chat_id`).
+* **Confirmación obligatoria con dirección**:
+  * Texto libre (ej. “Av. Siempreviva 742”).
+  * **GPS** (ej. `-27.3748, -55.9006`).
+* **Transferencia a humano** (distribuidor):
+  * Automática tras **confirmar dirección**.
+  * El cliente puede escribir **volver** o esperar **30 min** para regresar al bot.
+* **Borradores persistentes**:
+  * Carrito se mantiene aunque el cliente corte la conversación.
+* **Resúmenes dinámicos**:
+  * Subtotales, total de ítems y total de importe.
+* **Lenguaje natural y números**:
+  * “Quiero **10** de **amarillo**” / “**diez** de **azul**”.
 
-confirmar pedido con dirección
+---
 
-pasar a humano.
+## 🚀 Ventajas competitivas
+
+* Experiencia **simple**: solo WhatsApp.
+* Automatización **end-to-end** hasta derivar a un humano.
+* **Escalable** y **multiusuario**: cada `chat_id` tiene su borrador.
+* Carrito **flexible**: edición y eliminación en cualquier momento.
+* Entradas **robustas**: texto y **GPS**.
+* **Bajo consumo de IA**:
+  * \~**90%** de la lógica es **determinística** (JS + SQL).
+  * LLM **solo** para clasificar intención → menor costo/tokens.
+* **Extensible**:
+  * Conexión a **ERP**, **logística** o **pagos** (Mercado Pago, etc.).
+
+---
+
+## 🛒 Equivalencia con e-commerce clásico
+
+| Función e-commerce  | Función en WhatsApp Bot                          |
+| ------------------- | ------------------------------------------------ |
+| Carrito (draft)     | Tabla `orders_draft` por `chat_id`               |
+| Checkout            | Confirmación con **dirección obligatoria**       |
+| CRUD del carrito    | Insert / Read / Update / Delete (n8n + SQL)      |
+| Persistencia        | Carrito se mantiene aunque se corte el chat      |
+| Atención al cliente | **Derivación a humano** tras confirmar dirección |
+
+
+---
+
+## 🛠️ Tecnologías y versiones
+
+* **Docker Compose** – orquestación de servicios.
+* **Postgres `16`** – almacenamiento de borradores de pedidos.
+* **n8n `1.110.1`** – motor de automatización (nodos Code en JS).
+* **Evolution API** – gateway de WhatsApp (envío/recepción de mensajes).
+* **Node.js** (incluido en n8n) – lógica en JavaScript.
+* **LLM opcional (Gemini / OpenAI)** – **solo** como router de intenciones (ahorro de tokens).
+
+> 💡 El bot funciona **sin LLM** (ver [Modo sin LLM](#-modo-sin-llm-100-determinístico)).
+
+---
+
+## 🧱 Arquitectura
+
+* WhatsApp ⟷ **Evolution API** (webhook entrante + endpoints de envío).
+* **n8n** recibe el webhook, **parsea** el mensaje y decide acción:
+  * `insert`, `update`, `summary`, `address`, `update_specific`, `delete_one`, `delete_all`, `human`.
+* **Postgres** persiste el **carrito borrador** (`orders_draft`) por `chat_id`.
+* **Respuesta** al cliente con **texto** o **listas** (catálogo) vía Evolution API.
+
+---
+
+## 📂 Docker Compose (ejemplo)
+
+> Ajustá puertos, dominios y credenciales a tu entorno.
+
+```yaml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pg_emag
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-emag}
+      POSTGRES_USER: ${POSTGRES_USER:-emag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-emag123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  n8n:
+    image: n8nio/n8n:1.110.1
+    container_name: n8n_emag
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-emag}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-emag}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-emag123}
+      TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8ndata:/home/node/.n8n
+
+  evolution-api:
+    image: evolutionapi/evolution-api:latest
+    container_name: evo_emag
+    restart: unless-stopped
+    environment:
+      # Variables típicas (ajusta a tu proveedor/imagen)
+      INSTANCE_NAME: ${EVO_INSTANCE:-emag}
+      AUTH_TOKEN: ${EVO_TOKEN:-changeme}
+      PORT: 8080
+      # ...otras variables según documentación de tu build
+    ports:
+      - "8080:8080"
+    volumes:
+      - evodata:/evolution
+
+volumes:
+  pgdata:
+  n8ndata:
+  evodata:
+```
+
+---
+
+## 🔑 Variables de entorno
+
+Ejemplo `.env`:
+
+```env
+# Postgres
+POSTGRES_DB=emag
+POSTGRES_USER=emag
+POSTGRES_PASSWORD=emag123
+
+# n8n
+N8N_HOST=localhost
+WEBHOOK_URL=http://localhost:5678/
+
+# Evolution API
+EVO_INSTANCE=emag
+EVO_TOKEN=poné-un-token-fuerte
+```
+
+---
+
+## 🗃️ Esquema de base de datos
+
+```sql
+CREATE TABLE IF NOT EXISTS orders_draft (
+  id                SERIAL PRIMARY KEY,
+  chat_id           TEXT        NOT NULL,
+  product_code      TEXT        NOT NULL,
+  product_label     TEXT        NOT NULL,
+  quantity          INTEGER     NOT NULL CHECK (quantity >= 0),
+  status            TEXT        NOT NULL DEFAULT 'draft',     -- draft | with_human 
+  address           TEXT,
+  pending_edit_row  INTEGER,                                   -- para "editar específico"
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-SendText / SendList (Evolution API) → responde al cliente.
+CREATE INDEX IF NOT EXISTS idx_orders_draft_chat_status
+  ON orders_draft (chat_id, status);
+```
 
-📦 Lógica del pedido (CRUD)
+**Consultas típicas (n8n → Postgres):**
 
-Este bot implementa todas las operaciones de un carrito de compras:
+* **Insert/Update** (UPSERT por fila de carrito):
 
-Create (INSERT) → cliente selecciona producto del catálogo.
+```sql
+INSERT INTO orders_draft (chat_id, product_code, product_label, quantity, status)
+VALUES ($1, $2, $3, $4, 'draft')
+ON CONFLICT (id) DO NOTHING;
+```
 
-Read (READ) → cliente pide ver catálogo o resumen de pedido.
+* **Resumen de carrito**:
 
-Update (UPDATE) → cliente envía nueva cantidad o edita un producto específico.
+```sql
+SELECT product_label, quantity
+FROM orders_draft
+WHERE chat_id = $1 AND status = 'draft'
+ORDER BY updated_at DESC;
+```
 
-Delete (DELETE) → cliente elimina un producto o vacía el carrito.
+* **Vaciar carrito**:
 
-Todo se gestiona en la tabla orders_draft con columnas:
-id, chat_id, product_code, product_label, quantity, status, address, pending_edit_row.
+```sql
+DELETE FROM orders_draft
+WHERE chat_id = $1 AND status = 'draft';
+```
 
-✨ Características principales
+* **Confirmar con dirección**:
 
-Gestión de pedidos vía WhatsApp sin necesidad de apps externas.
+```sql
+UPDATE orders_draft
+SET status = 'confirmed', address = $2, updated_at = NOW()
+WHERE chat_id = $1 AND status = 'draft';
+```
 
-Selección guiada de productos (catálogo interactivo).
+> Podés adaptar a UPSERT por `(chat_id, product_code)` si preferís **una fila por producto**.
 
-Control granular del carrito:
+---
 
-Agregar productos.
+## 🔄 Flujo del bot (workflow)
 
-Editar cantidades.
+1. **Webhook Evolution API** → recibe mensajes de WhatsApp.
+2. **Parse Message** → extrae:
 
-Eliminar productos específicos.
+   * `chat_id`
+   * `text`
+   * `selectedRowId`, `selectedDescription` (si viene de catálogo/lista)
+   * **ubicación GPS**: `latitude`, `longitude` (si el cliente la comparte).
+3. **Detect Pedido (router)** → determina acción:
 
-Vaciar carrito completo.
+   * `insert`, `update`, `summary`, `address`, `update_specific`, `delete_one`, `delete_all`, `human`.
+   * Con LLM: solo **clasificación de intención** (bajo costo).
+   * Sin LLM: **regex/keywords** (ver [Modo sin LLM](#-modo-sin-llm-100-determinístico)).
+4. **Postgres** → guarda/actualiza en `orders_draft`.
+5. **Build Summary** → compone **resumen** con totales (ítems e importe si aplica).
+6. **Switch de acciones** → define próximo paso:
 
-Reiniciar carrito (reset por chat_id).
+   * mostrar **catálogo**
+   * **editar cantidad**
+   * **eliminar** producto
+   * **vaciar carrito**
+   * **confirmar** con **dirección** (texto o GPS)
+   * transferir a **humano**
+7. **SendText / SendList (Evolution API)** → respuesta al cliente.
 
-Confirmación obligatoria con dirección:
+---
 
-Texto libre (ej: “Av. Siempreviva 742”).
+📖 Explicación de los principales códigos
+🔹 Parse Message
 
-Coordenadas GPS (ej: -27.3748, -55.9006).
+Normaliza el mensaje entrante para que todo el flujo lo entienda:
 
-Transferencia a humano (distribuidor):
+<img width="1958" height="444" alt="image" src="https://github.com/user-attachments/assets/c04c39d4-47a0-4b26-bc21-64b3dcbc87a2" />
 
-Automática tras confirmar dirección.
 
-Cliente puede escribir volver o esperar 30 min para regresar al bot.
+🔹 Detect Action
 
-Manejo de borradores (draft):
+Interpreta acciones de menú/lista:
 
-Persistencia del carrito aunque el cliente interrumpa la conversación.
+<img width="1572" height="824" alt="image" src="https://github.com/user-attachments/assets/203b7180-83e2-49a5-a7d8-1a0f5d7d745e" />
 
-Resúmenes dinámicos:
+🔹 Detect Pedido
 
-Calcula subtotales, total de ítems y total de importe.
+Determina si el usuario está insertando, actualizando, cerrando o dando dirección:
 
-Soporte de lenguaje natural y números:
+<img width="1944" height="520" alt="image" src="https://github.com/user-attachments/assets/10b460c2-2073-4020-8471-fdfe7f7d0ca8" />
 
-“Quiero 10 de amarillo” o “diez de azul”.
 
-🚀 Ventajas competitivas
+🔹 Prompt de la IA
 
-Experiencia simple para el cliente: solo WhatsApp, sin apps externas.
+El modelo actúa como router, devolviendo SOLO un JSON válido:
 
-Automatización total del ciclo de compra hasta que entra un humano.
+{"route": N}
 
-Escalable y multiusuario: cada chat_id mantiene su propio borrador.
+1 → Menú
 
-Carrito flexible: productos editables y eliminables en cualquier momento.
+2 → Catálogo
 
-Robustez de entradas: acepta tanto texto como GPS.
+3 → Humano
 
-Bajo consumo de IA:
+4 → Pedido
 
-El 90% de la lógica es determinística (JS + SQL).
+5 → Acciones avanzadas
 
-El LLM se usa solo como router de intenciones, reduciendo costo y tokens.
+🔹 Build Summary
 
-Extensible:
+Arma el resumen con totales y dirección:
 
-Fácil de integrar con ERP, logística o pasarelas de pago.
+<img width="2850" height="672" alt="image" src="https://github.com/user-attachments/assets/319e8b5c-dcf1-406f-8725-aa9ff7162736" />
 
-🛒 Equivalente a un e-commerce clásico
 
-Este bot replica funciones tradicionales de un carrito online:
+🔹 Build Draft
 
-Función e-commerce	Función en WhatsApp Bot
-Carrito (draft)	Tabla orders_draft por chat_id
-Checkout (confirmación)	Confirmación con dirección obligatoria
-CRUD del carrito	Insert / Read / Update / Delete en n8n + SQL
-Persistencia	Pedido se guarda aunque el chat se interrumpa
-Atención al cliente	Derivación a humano tras dirección
-📚 Futuras mejoras
+Evita que el flujo se rompa cuando el carrito queda vacío:
 
-Integrar pagos automáticos.
+<img width="1312" height="406" alt="image" src="https://github.com/user-attachments/assets/74ea2ae1-178a-4d17-a605-970983a2924b" />
 
-Validación de stock en tiempo real.
 
-Historial de pedidos por cliente.
+---
 
-Panel de administración para distribuidores.
+## ⚙️ Instalación
 
-📷 Workflow visual
+1. **Clonar** este repositorio.
 
+2. Crear archivo **`.env`** (ver [Variables](#-variables-de-entorno)).
 
-(incluye switches, nodos SQL, IA router y lógica de catálogo/resumen)
+3. Levantar servicios:
 
-📝 Licencia
+   ```bash
+   docker compose up -d
+   ```
 
-Este proyecto se distribuye bajo licencia MIT.
+4. Abrir **n8n** (`http://localhost:5678/`) e **importar** el workflow:
+   `My workflow 2 (19).json`.
+
+5. Configurar el **webhook** de Evolution API → URL pública de n8n.
+
+---
+
+## 🚦 Uso rápido
+
+* Escribir “**catálogo**” para ver productos.
+* Enviar “**agregar amarillo 3**” para sumar 3 unidades del producto “amarillo”.
+* Enviar “**resumen**” para ver el carrito actual.
+* Enviar “**vaciar**” para limpiar el carrito.
+* Enviar **dirección** (texto) o **compartir ubicación** (GPS) para **confirmar**.
+* Para hablar con un **humano**, escribir “**humano**”.
+
+> El router detecta **intención** y ejecuta la acción correspondiente.
+
+---
+
+## 🧠 Modo sin LLM (100% determinístico)
+
+Si preferís **0 IA**, activá un **router por reglas** (regex/keywords):
+
+* `^catalogo|catálogo|lista` → `read_catalog`
+* `^resumen|carrito` → `summary`
+* `^vaciar|vacío|vaciar carrito` → `delete_all`
+* `^agregar\s+(\w+)\s+(\d+)` → `insert`
+* `^editar\s+(\w+)\s+(\d+)` → `update_specific`
+* `^eliminar\s+(\w+)` → `delete_one`
+* `^(ubicacion|dirección|direccion)` + datos → `address`
+* `^humano|asesor` → `human`
+
+Con esto, **no** necesitás LLM y evitás **costo/tokens**.
+
+---
+
+## 📚 Extensiones futuras
+
+* **Pagos automáticos** (ej. confirmación con link de pago).
+* **Validación de stock** en tiempo real.
+* **Historial** de pedidos por cliente.
+* **Panel admin** para distribuidores (resúmenes, asignaciones, estados).
+
+---
+
+## 🗺️ Workflow visual
+
+```mermaid
+flowchart TD
+  A[Webhook Evolution API] --> B[Parse Message\nchat_id, text, GPS, rowId]
+  B --> C{Router\nLLM opcional o Reglas}
+  C -->|insert| D[PG: INSERT draft]
+  C -->|update| E[PG: UPDATE qty]
+  C -->|delete_one| F[PG: DELETE item]
+  C -->|delete_all| G[PG: DELETE draft]
+  C -->|summary| H[PG: SELECT resumen]
+  C -->|address| I[PG: UPDATE address + CONFIRM]
+  C -->|human| J[Derivar a humano]
+
+  D & E & F & G & H & I --> K[Build Summary / Mensaje]
+  K --> L[SendText / SendList\nEvolution API]
+```
+## 📝 Licencia
+
+Este proyecto se distribuye bajo licencia **MIT**.
+© Refrigerantes **EMAG**.
